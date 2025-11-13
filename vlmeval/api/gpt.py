@@ -91,7 +91,7 @@ class OpenAIWrapper(BaseAPI):
                 key = env_key
             api_base = 'https://qianfan.baidubce.com/v2/chat/completions'
             self.baidu_appid = os.environ.get('BAIDU_APP_ID', None)
-        else:
+        elif key is None:
             if use_azure:
                 env_key = os.environ.get('AZURE_OPENAI_API_KEY', None)
                 assert env_key is not None, 'Please set the environment variable AZURE_OPENAI_API_KEY. '
@@ -196,6 +196,7 @@ class OpenAIWrapper(BaseAPI):
         return input_msgs
 
     def generate_inner(self, inputs, **kwargs) -> str:
+        kwargs.update(self.default_kwargs)
         input_msgs = self.prepare_inputs(inputs)
         temperature = kwargs.pop('temperature', self.temperature)
         max_tokens = kwargs.pop('max_tokens', self.max_tokens)

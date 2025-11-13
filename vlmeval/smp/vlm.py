@@ -186,6 +186,8 @@ def read_ok(img_path):
 
 
 def gpt_key_set():
+    if os.environ.get('PHYAGI_API_KEY', None) is not None:
+        return True
     openai_key = os.environ.get('OPENAI_API_KEY', None)
     if openai_key is None:
         openai_key = os.environ.get('AZURE_OPENAI_API_KEY', None)

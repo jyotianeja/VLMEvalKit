@@ -279,6 +279,17 @@ api_models = {
         max_tokens=2**14,
         timeout=300,
     ),
+    "bunny-phi3": partial(
+        GPT4V,
+        model="bunny-phi3",
+        img_detail="high",
+        retry=3,
+        key='none',
+        api_base='http://localhost:8080/v1/chat/completions',
+        verbose=False,
+        max_tokens=4096,
+        timeout=300,
+    ),
     # Gemini
     "GeminiPro1-0": partial(
         Gemini, model="gemini-1.0-pro", temperature=0, retry=10
