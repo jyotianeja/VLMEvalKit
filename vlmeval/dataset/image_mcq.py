@@ -90,7 +90,6 @@ class ImageMCQDataset(ImageBaseDataset):
         'AI2D_TEST_NO_MASK': 'https://opencompass.openxlab.space/utils/VLMEval/AI2D_TEST_NO_MASK.tsv',
         'MMStar': 'https://opencompass.openxlab.space/utils/VLMEval/MMStar.tsv',
         'MMStar_KO': 'https://huggingface.co/datasets/NCSOFT/K-MMStar/resolve/main/MMStar_KO.tsv',
-        'MMStar_TR': 'https://huggingface.co/datasets/kesimeg/MMStar_tr/resolve/main/MMStar_TR.tsv',
         'RealWorldQA': 'https://opencompass.openxlab.space/utils/VLMEval/RealWorldQA.tsv',
         'MLLMGuard_DS': 'https://opencompass.openxlab.space/utils/VLMEval/MLLMGuard_DS.tsv',
         'BLINK': 'https://opencompass.openxlab.space/utils/VLMEval/BLINK.tsv',
@@ -260,7 +259,7 @@ class ImageMCQDataset(ImageBaseDataset):
             circular = True
 
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o-impact']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -1471,8 +1470,8 @@ class WeMath(ImageBaseDataset):
 
         # model = judge_kwargs['model']
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['exact_matching', 'gpt-4-0125', 'gpt-4-turbo', 'gpt-4o-mini'], model
-        name_str_map = {'gpt-4-0125': 'gpt4', 'gpt-4-turbo': 'gpt4-turbo', 'gpt-4o-mini': 'gpt4o-mini'}
+        assert model in ['exact_matching', 'gpt-4-0125', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-4o-impact'], model
+        name_str_map = {'gpt-4-0125': 'gpt4', 'gpt-4-turbo': 'gpt4-turbo', 'gpt-4o-mini': 'gpt4o-mini', 'gpt-4o-impact': 'gpt4o-impact'}
         name_str = name_str_map[model] if model in name_str_map else model
 
         if model == 'exact_matching':
@@ -2334,24 +2333,8 @@ class VLMBlind(ImageMCQDataset):
                 ans = self.extract_content_in_braces(data_item["prediction"])
                 if ans == data_item["answers"]:
                     task_stats[task]['correct'] += 1
-            elif data_item["task"] == "Touching Circles":
-                if str.lower(data_item["answers"]) in str.lower(data_item["prediction"]):
-                    task_stats[task]['correct'] += 1
-            elif data_item["task"] == "Counting Grid - Word Grids":
+            elif data_item["task"] == "Touchdown Reading":
                 if self.compare_string_with_values(data_item["prediction"], data_item["answers"]):
-                    task_stats[task]['correct'] += 1
-            elif data_item["task"] == "Counting Grid - Blank Grids":
-                if self.compare_string_with_values(data_item["prediction"], data_item["answers"]):
-                    task_stats[task]['correct'] += 1
-            elif data_item["task"] == "Olympic Counting - Pentagons":
-                if data_item["answers"] in data_item["prediction"]:
-                    task_stats[task]['correct'] += 1
-            elif data_item["task"] == "Olympic Counting - Circles":
-                if data_item["answers"] in data_item["prediction"]:
-                    task_stats[task]['correct'] += 1
-            elif data_item["task"] == "Circled Letter":
-                ans = self.extract_content_in_braces(data_item["prediction"])
-                if ans == data_item["answers"]:
                     task_stats[task]['correct'] += 1
 
         accuracy_dict = {task: [stats['correct'] / stats['total']] for task, stats in sorted(task_stats.items())}

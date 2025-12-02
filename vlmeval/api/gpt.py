@@ -59,7 +59,7 @@ class OpenAIWrapper(BaseAPI):
             env_key = os.environ.get('STEPAI_API_KEY', '')
             if key is None:
                 key = env_key
-        elif 'yi-vision' in model:
+        elif 'yi-vision' in model or 'bunny-llama' in model:
             env_key = os.environ.get('YI_API_KEY', '')
             if key is None:
                 key = env_key
@@ -91,7 +91,7 @@ class OpenAIWrapper(BaseAPI):
                 key = env_key
             api_base = 'https://qianfan.baidubce.com/v2/chat/completions'
             self.baidu_appid = os.environ.get('BAIDU_APP_ID', None)
-        else:
+        elif key is None:
             if use_azure:
                 env_key = os.environ.get('AZURE_OPENAI_API_KEY', None)
                 assert env_key is not None, 'Please set the environment variable AZURE_OPENAI_API_KEY. '
@@ -180,6 +180,7 @@ class OpenAIWrapper(BaseAPI):
             text = '\n'.join([x['value'] for x in inputs])
             content_list = [dict(type='text', text=text)]
         return content_list
+        # return content_list[1]["text"]
 
     def prepare_inputs(self, inputs):
         input_msgs = []
@@ -196,6 +197,7 @@ class OpenAIWrapper(BaseAPI):
         return input_msgs
 
     def generate_inner(self, inputs, **kwargs) -> str:
+        kwargs.update(self.default_kwargs)
         input_msgs = self.prepare_inputs(inputs)
         temperature = kwargs.pop('temperature', self.temperature)
         max_tokens = kwargs.pop('max_tokens', self.max_tokens)
@@ -227,6 +229,13 @@ class OpenAIWrapper(BaseAPI):
             payload.pop('max_tokens')
             payload.pop('n')
             payload['reasoning_effort'] = 'high'
+        if 'bunny-llama' in self.model:
+            system_msg = ("A chat between a curious user and an artificial intelligence assistant. "
+              "The assistant gives helpful, detailed, and polite answers to the user's questions.")
+            payload["messages"] = [{"role": "system", "content": system_msg}] + payload["messages"]
+            payload.pop('n')
+            payload['stop'] = ["<|im_end|>"]    
+        # print(json.dumps(payload)); assert False
 
         response = requests.post(
             self.api_base,

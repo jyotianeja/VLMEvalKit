@@ -67,7 +67,7 @@ class BaseAPI:
             self.old_timeout = self.timeout
             self.timeout = 120
 
-        retry = 5
+        retry = 10
         while retry > 0:
             ret = self.generate('hello')
             if ret is not None and ret != '' and self.fail_msg not in ret:

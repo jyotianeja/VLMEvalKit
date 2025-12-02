@@ -313,13 +313,18 @@ class MathVista(ImageBaseDataset):
         from .utils.mathvista import MathVista_auxeval, MathVista_acc
 
         model = judge_kwargs['model']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o-impact']
+        print(f"Using model {model} for MathVista evaluation")
         storage = get_intermediate_file_path(eval_file, f'_{model}')
         tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        print(f"the temporary file is {tmp_file}")
         nproc = judge_kwargs.pop('nproc', 4)
 
         if not osp.exists(storage):
             data = load(eval_file)
             model = build_judge(max_tokens=128, **judge_kwargs)
+            print(f"Built judge model: {model}")
+            print("Checking if the model is working...")
             assert model.working(), 'MathVista evaluation requires a working OPENAI API\n' + DEBUG_MESSAGE
             lt = len(data)
             lines = [data.iloc[i] for i in range(lt)]

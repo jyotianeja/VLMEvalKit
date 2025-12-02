@@ -349,59 +349,73 @@ def main():
 
                 # Set the judge kwargs first before evaluation or dumping
 
-                judge_kwargs = {
-                    'nproc': args.api_nproc,
-                    'verbose': args.verbose,
-                    'retry': args.retry if args.retry is not None else 3,
-                    **(json.loads(args.judge_args) if args.judge_args else {}),
-                }
+                # Annoyingly there isn't a mechanism for the judge to
+                # use the models in the config.
+                if args.judge is not None and args.judge=='gpt-4o-impact':
+                    judge_kwargs = {
+                        'nproc': 100,
+                        'api_base': 'https://gateway.phyagi.net/api/chat/completions',
+                        'key': os.environ.get('PHYAGI_API_KEY', None),
+                        'tier': 'impact',
+                        'cache_seed': 42,
+                        'retry': args.retry if args.retry is not None else 3,
+                        'model': 'gpt-4o-impact',
+                    }
 
-                if args.retry is not None:
-                    judge_kwargs['retry'] = args.retry
-                if args.judge is not None:
-                    judge_kwargs['model'] = args.judge
                 else:
-                    print(dataset_name)
-                    if dataset.TYPE in ['MCQ', 'Y/N', 'MCQ_MMMU_Pro'] or listinstr(
-                        ['moviechat1k', 'mme-reasoning'], dataset_name.lower()
-                    ):
-                        if listinstr(['WeMath', 'MME-Reasoning'], dataset_name):
-                            judge_kwargs['model'] = 'gpt-4o-mini'
-                        elif listinstr(['VisuLogic'], dataset_name):
-                            judge_kwargs['model'] = 'exact_matching'
-                        else:
-                            judge_kwargs['model'] = 'chatgpt-0125'
-                    elif listinstr(['MMVet', 'LLaVABench', 'MMBench_Video'], dataset_name):
-                        if listinstr(['LLaVABench_KO'], dataset_name):
-                            judge_kwargs['model'] = 'gpt-4o-0806'
-                        else:
-                            judge_kwargs['model'] = 'gpt-4-turbo'
-                    elif listinstr(['VGRPBench'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4o'
-                    elif listinstr(['MathVista', 'MathVerse', 'MathVision', 'DynaMath', 'VL-RewardBench', 'LogicVista', 'MOAT', 'OCR_Reasoning'], dataset_name):  # noqa: E501
-                        judge_kwargs['model'] = 'gpt-4o-mini'
-                    elif listinstr(['OlympiadBench'], dataset_name):
-                        use_api_judger = judge_kwargs.get("olympiad_use_api_judger", False)
-                        if use_api_judger:
-                            judge_kwargs['model'] = 'gpt-4o-mini'
-                    elif listinstr(['MMLongBench', 'MMDU', 'DUDE', 'SLIDEVQA', 'MIA-Bench', 'WildVision', 'MMAlignBench', 'MM-IFEval'], dataset_name):  # noqa: E501
-                        judge_kwargs['model'] = 'gpt-4o'
-                    elif listinstr(['ChartMimic'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4o'
-                    elif listinstr(['VDC'], dataset_name):
-                        judge_kwargs['model'] = 'llama31-8b'
-                    elif listinstr(['Video_MMLU_QA', 'Video_MMLU_CAP'], dataset_name):
-                        judge_kwargs['model'] = 'qwen-72b'
-                    elif listinstr(['MMVMBench'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4o'
-                    elif listinstr(['CVQA_EN', 'CVQA_LOC'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4.1'
-                    elif listinstr(['M4Bench'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4o'
-                    elif listinstr(['AyaVisionBench'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4.1'
-                    elif listinstr(['MathCanvas'], dataset_name):
-                        judge_kwargs['model'] = 'gpt-4.1-2025-04-14'
+                    judge_kwargs = {
+                        'nproc': args.api_nproc,
+                        'verbose': args.verbose,
+                        'retry': args.retry if args.retry is not None else 3,
+                        **(json.loads(args.judge_args) if args.judge_args else {}),
+                    }
+
+                    if args.retry is not None:
+                        judge_kwargs['retry'] = args.retry
+                    if args.judge is not None:
+                        judge_kwargs['model'] = args.judge
+                    else:
+                        print(dataset_name)
+                        if dataset.TYPE in ['MCQ', 'Y/N', 'MCQ_MMMU_Pro'] or listinstr(
+                            ['moviechat1k', 'mme-reasoning'], dataset_name.lower()
+                        ):
+                            if listinstr(['WeMath', 'MME-Reasoning'], dataset_name):
+                                judge_kwargs['model'] = 'gpt-4o-mini'
+                            elif listinstr(['VisuLogic'], dataset_name):
+                                judge_kwargs['model'] = 'exact_matching'
+                            else:
+                                judge_kwargs['model'] = 'chatgpt-0125'
+                        elif listinstr(['MMVet', 'LLaVABench', 'MMBench_Video'], dataset_name):
+                            if listinstr(['LLaVABench_KO'], dataset_name):
+                                judge_kwargs['model'] = 'gpt-4o-0806'
+                            else:
+                                judge_kwargs['model'] = 'gpt-4-turbo'
+                        elif listinstr(['VGRPBench'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4o'
+                        elif listinstr(['MathVista', 'MathVerse', 'MathVision', 'DynaMath', 'VL-RewardBench', 'LogicVista', 'MOAT', 'OCR_Reasoning'], dataset_name):  # noqa: E501
+                            judge_kwargs['model'] = 'gpt-4o-impact'
+                        elif listinstr(['OlympiadBench'], dataset_name):
+                            use_api_judger = judge_kwargs.get("olympiad_use_api_judger", False)
+                            if use_api_judger:
+                                judge_kwargs['model'] = 'gpt-4o-mini'
+                        elif listinstr(['MMLongBench', 'MMDU', 'DUDE', 'SLIDEVQA', 'MIA-Bench', 'WildVision', 'MMAlignBench', 'MM-IFEval'], dataset_name):  # noqa: E501
+                            judge_kwargs['model'] = 'gpt-4o'
+                        elif listinstr(['ChartMimic'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4o'
+                        elif listinstr(['VDC'], dataset_name):
+                            judge_kwargs['model'] = 'llama31-8b'
+                        elif listinstr(['Video_MMLU_QA', 'Video_MMLU_CAP'], dataset_name):
+                            judge_kwargs['model'] = 'qwen-72b'
+                        elif listinstr(['MMVMBench'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4o'
+                        elif listinstr(['CVQA_EN', 'CVQA_LOC'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4.1'
+                        elif listinstr(['M4Bench'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4o'
+                        elif listinstr(['AyaVisionBench'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4.1'
+                        elif listinstr(['MathCanvas'], dataset_name):
+                            judge_kwargs['model'] = 'gpt-4.1-2025-04-14'
 
                 if args.use_verifier:
                     judge_kwargs['use_verifier'] = True
