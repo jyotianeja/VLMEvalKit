@@ -1,6 +1,8 @@
 from ..smp import *
 import os
 import sys
+import itertools
+import threading
 from .base import BaseAPI
 
 APIBASES = {
@@ -102,13 +104,14 @@ class OpenAIWrapper(BaseAPI):
                     'Please set the environment variable AZURE_OPENAI_API_KEY to your openai key. '
                 )
             else:
-                env_key = os.environ.get('OPENAI_API_KEY', '')
+                # env_key = os.environ.get('OPENAI_API_KEY', '')
+                env_key = os.environ.get('PHYAGI_API_KEY', '')
                 if key is None:
                     key = env_key
-                assert isinstance(key, str) and key.startswith('sk-'), (
-                    f'Illegal openai_key {key}. '
-                    'Please set the environment variable OPENAI_API_KEY to your openai key. '
-                )
+                # assert isinstance(key, str) and key.startswith('sk-'), (
+                    # f'Illegal openai_key {key}. '
+                    # 'Please set the environment variable OPENAI_API_KEY to your openai key. '
+                # )
 
         self.key = key
         assert img_size > 0 or img_size == -1
@@ -156,6 +159,17 @@ class OpenAIWrapper(BaseAPI):
             if os.environ.get('BOYUE', None):
                 self.api_base = os.environ.get('BOYUE_API_BASE')
                 self.key = os.environ.get('BOYUE_API_KEY')
+        # Round-robin support: if OPENAI_API_BASES is set (comma-separated URLs), rotate across them
+        api_bases_env = os.environ.get('OPENAI_API_BASES', '')
+        # if api_bases_env:
+        if api_bases_env and api_base == "http://localhost:8000/v1/chat/completions": #note port 8000 is hardcoded here
+            self.api_bases = [u.strip() for u in api_bases_env.split(',') if u.strip()]
+            self._rr_cycle = itertools.cycle(self.api_bases)
+            self._rr_lock = threading.Lock()
+            self.logger.info(f'Round-robin across {len(self.api_bases)} API bases: {self.api_bases}')
+        else:
+            self.api_bases = None
+        
 
         self.logger.info(f'Using API Base: {self.api_base}; API Key: {self.key}')
 
@@ -228,9 +242,17 @@ class OpenAIWrapper(BaseAPI):
             payload.pop('max_tokens')
             payload.pop('n')
             payload['reasoning_effort'] = 'high'
-
+        # print(f'****************** API Request Payload : {payload}')
+        # assert False
+        
+        if self.api_bases:
+            with self._rr_lock:
+                api_url = next(self._rr_cycle)
+        else:
+            api_url = self.api_base
         response = requests.post(
-            self.api_base,
+            # self.api_base,
+            api_url,
             headers=headers, data=json.dumps(payload), timeout=self.timeout * 1.1)
         ret_code = response.status_code
         ret_code = 0 if (200 <= int(ret_code) < 300) else ret_code
@@ -242,7 +264,7 @@ class OpenAIWrapper(BaseAPI):
             if self.verbose:
                 self.logger.error(f'{type(err)}: {err}')
                 self.logger.error(response.text if hasattr(response, 'text') else response)
-
+        # print(f'API Response : {response}')
         return ret_code, answer, response
 
     def get_image_token_len(self, img_path, detail='low'):

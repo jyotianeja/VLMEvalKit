@@ -1,31 +1,28 @@
 evals_to_run = [
-    "AI2D_TEST",
-    "atomic_dataset",
-    "BLINK",
-    "CCBench",
-    "CCOCR",
-    "ChartMimic_v1_direct",
-    "ChartMuseum_test",
-    "ChartQA_TEST",
-    "ChartQAPro",
-    "CharXiv_descriptive_val",
-    "CMMU_MCQ",
-    "COCO_VAL",
-    "Detailed_Difference",
-    "DocVQA_VAL",
-    "DUDE",
-    "EMMA",
-    "GOBench",
-    "GSM8K-V",
-    "HallusionBench",
-    "LEGO",
-    "LiveMMBench_Infographic",
-    "LiveMMBench_Perception",
-    "LiveMMBench_Reasoning",
-    "LogicVista",
+    "MathVista_MINI",
     "MathVerse_MINI",
     "MathVision_MINI",
-    "MathVista_MINI"
+    "AI2D_TEST",
+    "BLINK",
+    # "ChartMuseum_test",
+    "ChartQA_TEST",
+    # "CharXiv_descriptive_val",
+    "DocVQA_VAL",
+    "HallusionBench",
+    # "LogicVista",
+    "MMMU_DEV_VAL",
+    "MMStar",
+    # "MUIRBench",
+    "OCRBench",
+    # "OlympiadBench",
+    "ScreenSpot_v2_Desktop",
+    "ScreenSpot_v2_Mobile",
+    "ScreenSpot_v2_Web",
+    # "ScreenSpot_Pro",
+    "WeMath",
+    "WildVision",
+    "ZEROBench_sub",
+    # # "VStarBench"
 ]
 
 import subprocess, signal, sys, threading, os
@@ -34,38 +31,61 @@ from datetime import datetime
 from queue import Queue
 
 
-logs_dir = Path("/home/mharrison/repos/VLMEvalKit/logs")
+logs_dir = Path("/home/jyotianeja/VLMEvalKit/logs")
 logs_dir.mkdir(exist_ok=True)
 
-def make_command(deployed_model_name, port, eval_name):
+def make_command(deployed_model_name, port, eval_name, api_nproc):
     return [
         "python",
         "run.py",
         "--model",
         deployed_model_name + f"-{port}",
         "--api-nproc",
-        "1",
+        str(api_nproc),
         "--judge",
-        "gpt-4o-impact",
+        "gpt-4o",
         "--data",
         eval_name
     ]
 
-deployed_model_name = "bunny-phi3"
-PORTS = ["8080", "8081"]
+def parse_cli_args():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run evals from a predefined list.")
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        help="Base name of the deployed model to evaluate.",
+    )
+    parser.add_argument(
+        "--ports",
+        type=str,
+        nargs="+",
+        required=True,
+        help="List of ports where the model is deployed.",
+    )
+    parser.add_argument(
+        "--par",
+        type=int,
+        default=1,
+        help="Number of API processes to use.",
+    )
+    args = parser.parse_args()
+    return args
 
 STOP = False  # flag to tell workers to stop early on Ctrl-C
 
 
-def run_eval_job(port: int, eval_name: str) -> int:
+def run_eval_job(port: int, deployed_model_name: str, eval_name: str, api_nproc: int) -> int:
     """
     Run one eval for a given port. Returns the subprocess return code.
     """
 
-    cmd = make_command(deployed_model_name, port, eval_name)
+    cmd = make_command(deployed_model_name, port, eval_name, api_nproc)
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_path = logs_dir / f"{eval_name}_port{port}_{timestamp}.log"
+    log_path = logs_dir / f"{eval_name}_model{deployed_model_name}_port{port}_{timestamp}.log"
     with log_path.open("a", buffering=1) as log_file:
         log_file.write(f"=== START {eval_name} on port {port} ===\n")
         log_file.write(f"CMD: {' '.join(cmd)}\n\n")
@@ -83,7 +103,7 @@ def run_eval_job(port: int, eval_name: str) -> int:
     return return_code
 
 
-def worker(port: int, job_queue: Queue):
+def worker(port: int, deployed_model_name: str, job_queue: Queue, api_nproc):
     """
     Worker loop: always grab the next job and run it on this port.
     """
@@ -94,7 +114,7 @@ def worker(port: int, job_queue: Queue):
             break
 
         try:
-            rc = run_eval_job(port, eval_name)
+            rc = run_eval_job(port, deployed_model_name, eval_name, api_nproc)
             print(f"[port {port}] job {eval_name} finished with rc={rc}")
         except Exception as e:
             print(f"[port {port}] job {eval_name} failed: {e}", file=sys.stderr)
@@ -102,7 +122,7 @@ def worker(port: int, job_queue: Queue):
             job_queue.task_done()
 
 
-def main():
+def main(model_name, ports, api_nproc):
     global STOP
 
     job_queue = Queue()
@@ -110,8 +130,8 @@ def main():
         job_queue.put(job)
 
     threads = []
-    for port in PORTS:
-        t = threading.Thread(target=worker, args=(port, job_queue), daemon=True)
+    for port in ports:
+        t = threading.Thread(target=worker, args=(port, model_name, job_queue, api_nproc), daemon=True)
         t.start()
         threads.append(t)
 
@@ -129,4 +149,11 @@ def main():
     print("All jobs done (or interrupted).")
 
 if __name__ == "__main__":
-    main()
+    try:
+        args = parse_cli_args()
+        deployed_model_name = args.model
+        PORTS = args.ports
+        api_nproc = args.par
+    except:
+        raise("Failed to parse CLI arguments.")
+    main(deployed_model_name, PORTS, api_nproc)

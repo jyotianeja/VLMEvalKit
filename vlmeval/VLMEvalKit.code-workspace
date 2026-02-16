@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../Eureka"
+		},
+		{
+			"path": "../../Bunny"
+		}
+	],
+	"settings": {}
+}

@@ -51,11 +51,13 @@ from vlmeval.utils.result_transfer import MMMU_result_transfer, MMTBench_result_
 
 # Make WORLD_SIZE invisible when build models
 def build_model_from_config(cfg, model_name, use_vllm=False):
+    print(f'model_name: {model_name}, use_vllm: {use_vllm}')
     import vlmeval.api
     import vlmeval.vlm
     ws_bak = os.environ.pop('WORLD_SIZE', None)
 
     config = cp.deepcopy(cfg[model_name])
+    print(f'************************ the config of model {model_name}: {config}')
     if use_vllm:
         config['use_vllm'] = use_vllm
     if 'class' not in config:
@@ -203,12 +205,15 @@ You can launch the evaluation by setting either --data and --model or --config.
 def main():
     logger = get_logger('RUN')
     args = parse_args()
+    print(f'Parsed Args: {args}')
+    print(f'type of args.data: {type(args.data)}, type of args.model: {type(args.model)}')
     use_config, cfg = False, None
     if args.config is not None:
         assert args.data is None and args.model is None, '--data and --model should not be set when using --config'
         use_config, cfg = True, load(args.config)
         args.model = list(cfg['model'].keys())
         args.data = list(cfg['data'].keys())
+        print(f'******************** Loaded config from {args.config}, found models: {args.model}, datasets: {args.data}')
     else:
         assert len(args.data), '--data should be a list of data files'
 
@@ -351,15 +356,16 @@ def main():
 
                 # Annoyingly there isn't a mechanism for the judge to
                 # use the models in the config.
-                if args.judge is not None and args.judge=='gpt-4o-impact':
+                if args.judge is not None and args.judge=='gpt-4o':
+                    print("Using PhyAGI GPT-4o-Impact as judge model.")
                     judge_kwargs = {
                         'nproc': 100,
                         'api_base': 'https://gateway.phyagi.net/api/chat/completions',
                         'key': os.environ.get('PHYAGI_API_KEY', None),
-                        'tier': 'impact',
+                        'tier': 'base',
                         'cache_seed': 42,
                         'retry': args.retry if args.retry is not None else 3,
-                        'model': 'gpt-4o-impact',
+                        'model': 'gpt-4o',
                     }
 
                 else:
@@ -393,7 +399,7 @@ def main():
                         elif listinstr(['VGRPBench'], dataset_name):
                             judge_kwargs['model'] = 'gpt-4o'
                         elif listinstr(['MathVista', 'MathVerse', 'MathVision', 'DynaMath', 'VL-RewardBench', 'LogicVista', 'MOAT', 'OCR_Reasoning'], dataset_name):  # noqa: E501
-                            judge_kwargs['model'] = 'gpt-4o-mini'
+                            judge_kwargs['model'] = 'gpt-4o'
                         elif listinstr(['OlympiadBench'], dataset_name):
                             use_api_judger = judge_kwargs.get("olympiad_use_api_judger", False)
                             if use_api_judger:

@@ -259,7 +259,7 @@ class ImageMCQDataset(ImageBaseDataset):
             circular = True
 
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -804,7 +804,7 @@ class GMAIMMBenchDataset(ImageMCQDataset):
 
         suffix = eval_file.split('.')[-1]
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -1286,7 +1286,7 @@ class HRBenchDataset(ImageMCQDataset):
         nproc = judge_kwargs.pop('nproc', 4)
 
         model = judge_kwargs.get('model', 'extract_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -1470,7 +1470,7 @@ class WeMath(ImageBaseDataset):
 
         # model = judge_kwargs['model']
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['exact_matching', 'gpt-4-0125', 'gpt-4-turbo', 'gpt-4o-mini'], model
+        assert model in ['exact_matching', 'gpt-4-0125', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-4o'], model
         name_str_map = {'gpt-4-0125': 'gpt4', 'gpt-4-turbo': 'gpt4-turbo', 'gpt-4o-mini': 'gpt4o-mini'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -1705,7 +1705,7 @@ class VisuLogic(ImageMCQDataset):
 
         # model = judge_kwargs['model']
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['exact_matching', 'gpt-4-0125', 'gpt-4-turbo', 'gpt-4o-mini'], model
+        assert model in ['exact_matching', 'gpt-4-0125', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-4o'], model
         name_str_map = {'gpt-4-0125': 'gpt4', 'gpt-4-turbo': 'gpt4-turbo', 'gpt-4o-mini': 'gpt4o-mini'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -1781,7 +1781,7 @@ class TDBench(ImageMCQDataset):
         nproc = judge_kwargs.pop('nproc', 4)
 
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o-mini']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o-mini', 'gpt-4o']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4', 'gpt-4o-mini': 'gpt4omini'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -2510,7 +2510,7 @@ class AffordanceDataset(ImageMCQDataset):
 
         suffix = eval_file.split('.')[-1]
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
         name_str = name_str_map[model] if model in name_str_map else model
 
@@ -2887,7 +2887,7 @@ class TopViewRS(ImageMCQDataset):
         nproc = judge_kwargs.pop('nproc', 4)
         suffix = eval_file.split('.')[-1]
         model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125', 'gpt-4o']
         name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
         name_str = name_str_map[model] if model in name_str_map else model
 

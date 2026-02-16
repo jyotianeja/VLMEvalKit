@@ -65,6 +65,7 @@ def infer_data_api(model, work_dir, model_name, dataset, index_set=None, api_npr
             res = {k: v for k, v in res.items() if FAIL_MSG not in v}
 
     structs = [s for i, s in zip(indices, structs) if i not in res]
+    # print(f'********* print structs example: {structs[0:2]}')
     indices = [i for i in indices if i not in res]
 
     gen_func = model.generate
@@ -74,6 +75,7 @@ def infer_data_api(model, work_dir, model_name, dataset, index_set=None, api_npr
         track_progress_rich(gen_func, structs, nproc=api_nproc, chunksize=api_nproc, save=out_file, keys=indices)
 
     res = load(out_file)
+    # print(f'********* print res example: {list(res.items())[0:2]}')
     if index_set is not None:
         res = {k: v for k, v in res.items() if k in index_set}
     os.remove(out_file)
@@ -82,13 +84,16 @@ def infer_data_api(model, work_dir, model_name, dataset, index_set=None, api_npr
 
 def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, api_nproc=4, use_vllm=False):
     dataset_name = dataset.dataset_name
-    prev_file = f'{work_dir}/{model_name}_{dataset_name}_PREV.pkl'
-    res = load(prev_file) if osp.exists(prev_file) else {}
+    #TODO change this back after debugging
+    # prev_file = f'{work_dir}/{model_name}_{dataset_name}_PREV.pkl'
+    # res = load(prev_file) if osp.exists(prev_file) else {}
+    res = {}
     if osp.exists(out_file):
         res.update(load(out_file))
 
     rank, world_size = get_rank_and_world_size()
     sheet_indices = list(range(rank, len(dataset), world_size))
+    # sheet_indices = list(range(rank, 2, world_size))
     lt = len(sheet_indices)
     data = dataset.data.iloc[sheet_indices]
     data_indices = [i for i in data['index']]
@@ -241,9 +246,12 @@ def infer_data_job(
             data['thinking'] = [x[1] for x in tups]
         else:
             data['prediction'] = [str(data_all[x]) for x in data['index']]
+            print(f'************* Prediction format: {os.getenv("SPLIT_THINK")}, no splitting applied.')
+            print(f'************* Examples prediction: {data["prediction"][0:5]}')
         if 'image' in data:
             data.pop('image')
-
+        print(f'************* Saving results to {result_file}')
+        print(f'************* Example results: {data["prediction"][0:5]}')
         dump(data, result_file)
         for i in range(world_size):
             os.remove(tmpl.format(i))

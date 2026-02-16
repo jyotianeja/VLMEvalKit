@@ -1,0 +1,69 @@
+version: '3.8'
+
+x-vllm-common: &vllm-common
+  image: vllm/vllm-openai:latest
+  volumes:
+    - /home/jyotianeja/.cache/huggingface
+  environment:
+    - HF_TOKEN=${HF_TOKEN}
+    - HF_HOME=/app/hf_cache
+    - VLLM_WORKER_MULTIPROC_METHOD=spawn
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 30s 
+    timeout: 10s 
+    retries: 3
+    start_period: 120s
+  command: >
+    --model Qwen/Qwen3-VL-8B-Instruct
+    --host 0.0.0.0
+    --port 8000
+    --max-num-seqs 8
+    --max-model-len 32768
+    --gpu-memory-utilization 0.9 
+
+services:
+  vllm-0:
+    <<: *vllm-common
+    ports: ["8000:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+
+  vllm-1:
+    <<: *vllm-common
+    ports: ["8001:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+
+  vllm-2:
+    <<: *vllm-common
+    ports: ["8002:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["2"]
+              capabilities: [gpu]
+
+  vllm-3:
+    <<: *vllm-common
+    ports: ["8003:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["3"]
+              capabilities: [gpu]

@@ -18,7 +18,8 @@ def build_judge(**kwargs):
             'gpt-4-0409': 'gpt-4-turbo-2024-04-09',
             'chatgpt-1106': 'gpt-3.5-turbo-1106',
             'chatgpt-0125': 'gpt-3.5-turbo-0125',
-            'gpt-4o': 'gpt-4o-2024-05-13',
+            # 'gpt-4o': 'gpt-4o-2024-05-13',
+            'gpt-4o': 'gpt-4o',
             'gpt-4o-0806': 'gpt-4o-2024-08-06',
             'gpt-4o-1120': 'gpt-4o-2024-11-20',
             'gpt-4o-mini': 'gpt-4o-mini-2024-07-18',
@@ -26,6 +27,7 @@ def build_judge(**kwargs):
             'qwen-72b': 'Qwen/Qwen2.5-72B-Instruct',
             'deepseek': 'deepseek-ai/DeepSeek-V3',
             'llama31-8b': 'meta-llama/Llama-3.1-8B-Instruct',
+            
         }
         model_version = model_map[model] if model in model_map else model
     else:
