@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.distributed as dist
 from vlmeval.config import supported_VLM
@@ -22,18 +23,32 @@ def chat_mt(model, messages, dataset_name):
     nturn = len(messages) // 2
     utter_stack = []
     predictions = []
+    response_times = []
+    completion_tokens_list = []
 
     for i in range(nturn):
         utter = messages[2 * i]
         utter_stack.append(utter)
         try:
+            inference_start = time.time()
             resp = model.chat(utter_stack, dataset=dataset_name)
+            inference_end = time.time()
+            resp_time = inference_end - inference_start
             utter_stack.append(dict(role='assistant', content=resp))
         except Exception as e:
             resp = FAIL_MSG + str(e)
+            resp_time = None
             utter_stack.append(dict(role='assistant', content=resp))
+        
+        # Extract completion tokens if available
+        comp_tokens = None
+        if isinstance(resp, dict) and 'usage' in resp:
+            comp_tokens = resp.get('usage', {}).get('completion_tokens')
+        
         predictions.append(resp)
-    return predictions
+        response_times.append(resp_time)
+        completion_tokens_list.append(comp_tokens)
+    return predictions, response_times, completion_tokens_list
 
 
 # Only API model is accepted
@@ -148,19 +163,19 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         else:
             struct = dataset.build_prompt(data.iloc[i])
 
-        response = chat_mt(model, struct, dataset_name)
+        response, response_times, completion_tokens_list = chat_mt(model, struct, dataset_name)
         torch.cuda.empty_cache()
 
         if verbose:
             print(response, flush=True)
 
-        res[idx] = response
+        res[idx] = {'response': response, 'response_times': response_times, 'completion_tokens': completion_tokens_list}
         if (i + 1) % 20 == 0:
             dump(res, out_file)
 
     res = {k: res[k] for k in data_indices}
     dump(res, out_file)
-    return model
+    return model, res
 
 
 # A wrapper for infer_data, do the pre & post processing
@@ -174,7 +189,7 @@ def infer_data_job_mt(
     tmpl = osp.join(work_dir, '{}' + f'{world_size}_{dataset_name}.pkl')
     out_file = tmpl.format(rank)
 
-    model = infer_data(
+    model, infer_res = infer_data(
         model=model, work_dir=work_dir, model_name=model_name, dataset=dataset,
         out_file=out_file, verbose=verbose, api_nproc=api_nproc, use_vllm=use_vllm)
     if world_size > 1:
@@ -189,7 +204,21 @@ def infer_data_job_mt(
         for x in data['index']:
             assert x in data_all
 
-        data['prediction'] = [data_all[x] for x in data['index']]
+        predictions = []
+        response_times_list = []
+        completion_tokens_all = []
+        for x in data['index']:
+            item = data_all[x]
+            resp = item['response'] if isinstance(item, dict) else item
+            resp_times = item.get('response_times') if isinstance(item, dict) else None
+            comp_tokens = item.get('completion_tokens') if isinstance(item, dict) else None
+            predictions.append(resp)
+            response_times_list.append(resp_times)
+            completion_tokens_all.append(comp_tokens)
+        
+        data['prediction'] = predictions
+        data['response_times'] = response_times_list
+        data['completion_tokens'] = completion_tokens_all
         if 'image' in data:
             data.pop('image')
 

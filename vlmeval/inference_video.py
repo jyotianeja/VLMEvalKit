@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.distributed as dist
 from vlmeval.config import supported_VLM
@@ -182,25 +183,38 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         if os.environ.get('SKIP_ERR', False) == '1':
             FAIL_MSG = 'Failed to obtain answer'
             try:
+                inference_start = time.time()
                 response = model.generate(message=struct, dataset=dataset_name)
+                inference_end = time.time()
+                response_time = inference_end - inference_start
             except RuntimeError as err:
                 torch.cuda.synchronize()
                 warnings.error(f'{type(err)} {str(err)}')
                 response = f'{FAIL_MSG}: {type(err)} {str(err)}'
+                response_time = None
         else:
+            inference_start = time.time()
             response = model.generate(message=struct, dataset=dataset_name)
+            inference_end = time.time()
+            response_time = inference_end - inference_start
+        
+        # Extract completion tokens if available
+        completion_tokens = None
+        if isinstance(response, dict) and 'usage' in response:
+            completion_tokens = response.get('usage', {}).get('completion_tokens')
+        
         torch.cuda.empty_cache()
 
         if verbose:
             print(response, flush=True)
 
-        res[idx] = response
+        res[idx] = {'response': response, 'response_time': response_time, 'completion_tokens': completion_tokens}
         if (i + 1) % 20 == 0:
             dump(res, out_file)
 
     res = {k: res[k] for k in sample_indices_sub}
     dump(res, out_file)
-    return model
+    return model, res
 
 
 # A wrapper for infer_data, do the pre & post processing
@@ -224,7 +238,7 @@ def infer_data_job_video(
     tmpl = osp.join(work_dir, '{}' + f'{world_size}_{osp.splitext(result_file_name)[0]}.pkl')
     out_file = tmpl.format(rank)
 
-    model = infer_data(
+    model, infer_res = infer_data(
         model=model,
         model_name=model_name,
         work_dir=work_dir,
@@ -249,7 +263,20 @@ def infer_data_job_video(
         else:
             for x in meta['index']:
                 assert x in data_all
-            meta['prediction'] = [str(data_all[x]) for x in meta['index']]
+            predictions = []
+            response_times = []
+            completion_tokens_all = []
+            for x in meta['index']:
+                item = data_all[x]
+                resp = item['response'] if isinstance(item, dict) else item
+                resp_time = item.get('response_time') if isinstance(item, dict) else None
+                comp_tokens = item.get('completion_tokens') if isinstance(item, dict) else None
+                predictions.append(str(resp))
+                response_times.append(resp_time)
+                completion_tokens_all.append(comp_tokens)
+            meta['prediction'] = predictions
+            meta['response_time'] = response_times
+            meta['completion_tokens'] = completion_tokens_all
             if 'image' in meta:
                 meta.pop('image')
 
