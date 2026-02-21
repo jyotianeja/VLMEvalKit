@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.distributed as dist
 from vlmeval.config import supported_VLM
@@ -107,7 +108,7 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
     if all_finished:
         res = {k: res[k] for k in data_indices}
         dump(res, out_file)
-        return model
+        return model, res
 
     # Data need to be inferred
     data = data[~data['index'].isin(res)]
@@ -133,6 +134,7 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
     is_api = getattr(model, 'is_api', False)
     if is_api:
         lt, indices = len(data), list(data['index'])
+        api_start = time.time()
         supp = infer_data_api(
             model=model,
             work_dir=work_dir,
@@ -140,12 +142,19 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
             dataset=dataset,
             index_set=set(indices),
             api_nproc=api_nproc)
+        
+        api_end = time.time()
+        api_total_time = api_end - api_start
+        avg_time = api_total_time / len(indices) if indices else 0
+        print(f'************* API inference total time: {api_total_time:.2f}s for {len(indices)} samples')
+        print(f'************* API inference avg time per sample: {avg_time:.2f}s')
+        
         for idx in indices:
             assert idx in supp
         res.update(supp)
         res = {k: res[k] for k in data_indices}
         dump(res, out_file)
-        return model
+        return model, res
     else:
         model.set_dump_image(dataset.dump_image)
 
@@ -163,25 +172,40 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         if os.environ.get('SKIP_ERR', False) == '1':
             FAIL_MSG = 'Failed to obtain answer'
             try:
+                inference_start = time.time()
                 response = model.generate(message=struct, dataset=dataset_name)
+                inference_end = time.time()
+                response_time = inference_end - inference_start
             except RuntimeError as err:
                 torch.cuda.synchronize()
                 warnings.warn(f'{type(err)} {str(err)}')
                 response = f'{FAIL_MSG}: {type(err)} {str(err)}'
+                response_time = None
         else:
+            inference_start = time.time()
             response = model.generate(message=struct, dataset=dataset_name)
+            inference_end = time.time()
+            response_time = inference_end - inference_start
+        
+        # Extract completion tokens if available
+        completion_tokens = None
+        if isinstance(response, dict) and 'usage' in response:
+            completion_tokens = response.get('usage', {}).get('completion_tokens')
+        
         torch.cuda.empty_cache()
 
         if verbose:
             print(response, flush=True)
 
-        res[idx] = response
+        res[idx] = {'response': response, 'response_time': response_time, 'completion_tokens': completion_tokens}
+        print(f'[{idx}] response_time: {response_time:.2f}s, completion_tokens: {completion_tokens}')  # ADD THIS
+        
         if (i + 1) % 10 == 0:
             dump(res, out_file)
-
+        
     res = {k: res[k] for k in data_indices}
     dump(res, out_file)
-    return model
+    return model, res
 
 
 # A wrapper for infer_data, do the pre & post processing
@@ -208,7 +232,7 @@ def infer_data_job(
     tmpl = osp.join(work_dir, '{}' + f'{world_size}_{dataset_name}.pkl')
     out_file = tmpl.format(rank)
 
-    model = infer_data(
+    model, infer_res = infer_data(
         model=model, work_dir=work_dir, model_name=model_name, dataset=dataset,
         out_file=out_file, verbose=verbose, api_nproc=api_nproc, use_vllm=use_vllm)
     if world_size > 1:
@@ -223,7 +247,17 @@ def infer_data_job(
         for x in data['index']:
             assert x in data_all
         if os.getenv('SPLIT_THINK', False):
-            prediction = [str(data_all[x]) for x in data['index']]
+            prediction = []
+            response_times = []
+            completion_tokens_list = []
+            for x in data['index']:
+                item = data_all[x]
+                resp_text = item['response'] if isinstance(item, dict) else item
+                resp_time = item.get('response_time') if isinstance(item, dict) else None
+                comp_tokens = item.get('completion_tokens') if isinstance(item, dict) else None
+                prediction.append(str(resp_text))
+                response_times.append(resp_time)
+                completion_tokens_list.append(comp_tokens)
 
             def split_thinking(s):
                 if '</think>' in s:
@@ -244,14 +278,38 @@ def infer_data_job(
             tups = [split_func(x) for x in prediction]
             data['prediction'] = [x[0] for x in tups]
             data['thinking'] = [x[1] for x in tups]
+            data['response_time'] = response_times
+            data['completion_tokens'] = completion_tokens_list
         else:
-            data['prediction'] = [str(data_all[x]) for x in data['index']]
+            prediction = []
+            response_times = []
+            completion_tokens_list = []
+            for x in data['index']:
+                item = data_all[x]
+                resp_text = item['response'] if isinstance(item, dict) else item
+                resp_time = item.get('response_time') if isinstance(item, dict) else None
+                comp_tokens = item.get('completion_tokens') if isinstance(item, dict) else None
+                prediction.append(str(resp_text))
+                response_times.append(resp_time)
+                completion_tokens_list.append(comp_tokens)
+            data['prediction'] = prediction
+            data['response_time'] = response_times
+            data['completion_tokens'] = completion_tokens_list
             print(f'************* Prediction format: {os.getenv("SPLIT_THINK")}, no splitting applied.')
-            print(f'************* Examples prediction: {data["prediction"][0:5]}')
+            # print(f'************* Examples prediction: {data["prediction"][0:5]}')
+            # print(f'************* Examples response_time: {data["response_time"][0:5]}')
+            print(f'************* Examples completion_tokens: {data["completion_tokens"][0:5]}')
+            print(f'************* total completion tokens: {sum([t for t in data["completion_tokens"] if t is not None])}')
+            
+        times = [t for t in data['response_time'] if t is not None]
+        if times:
+            print(f'************* Avg response_time: {sum(times)/len(times):.2f}s over {len(times)} samples')
+            print(f'************* Total response_time: {sum(times):.2f}s')
+
         if 'image' in data:
             data.pop('image')
         print(f'************* Saving results to {result_file}')
-        print(f'************* Example results: {data["prediction"][0:5]}')
+        # print(f'************* Example results: {data["prediction"][0:5]}')
         dump(data, result_file)
         for i in range(world_size):
             os.remove(tmpl.format(i))
