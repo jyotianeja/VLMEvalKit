@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 from functools import partial
+import pandas as pd
 
 
 # GET the number of GPUs on the node without importing libs like torch
@@ -480,7 +481,51 @@ def main():
                         proxy_set(eval_proxy)
 
                     # Perform the Evaluation
-                    eval_results = dataset.evaluate(result_file, **judge_kwargs)
+                    print(f'*********** Evaluating model {model_name} on dataset {dataset_name} with judge kwargs: {judge_kwargs}')
+                    
+                    # remove think section before evals inplace for all data.
+                    ###########################
+                    df = pd.read_excel(result_file)
+                    # print(df.columns)
+                    # print(df.head())
+
+                    # Split on </think> to separate thinking from prediction
+                    if 'prediction' in df.columns:
+                        df['prediction'] = df['prediction'].str.replace('◁think▷', '<think>', regex=False)
+                        df['prediction'] = df['prediction'].str.replace('◁/think▷', '</think>', regex=False)
+
+                        def split_think(text):
+                            if not isinstance(text, str):
+                                return '', text
+                            if '</think>' in text:
+                                parts = text.split('</think>', 1)
+                                thinking = parts[0].replace('<think>', '').strip()
+                                prediction = parts[1].strip()
+                            else:
+                                thinking = ''
+                                prediction = text
+                            return thinking, prediction
+
+                        df[['thinking', 'prediction']] = pd.DataFrame(
+                            df['prediction'].apply(split_think).tolist(),
+                            index=df.index
+                        )
+                        tmp_result_file = result_file.replace(
+                            f'.{result_file.rsplit(".", 1)[-1]}',
+                            f'_tmp.{result_file.rsplit(".", 1)[-1]}'
+                        )
+                        df.to_excel(tmp_result_file, index=False)
+                        logger.info(f'Saved think-stripped result to tmp file: {tmp_result_file}')
+                    else:
+                        tmp_result_file = result_file
+                        logger.warning('No "prediction" column found, skipping think-stripping.')
+
+                    eval_results = dataset.evaluate(tmp_result_file, **judge_kwargs)
+                    
+                    
+                    ###########################
+                    # eval_results = dataset.evaluate(result_file, **judge_kwargs)
+                    # print(f'*********** Evaluation finished, results: {eval_results}')
                     # Display Evaluation Results in Terminal
                     if eval_results is not None:
                         assert isinstance(eval_results, dict) or isinstance(eval_results, pd.DataFrame)
