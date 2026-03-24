@@ -1,27 +1,27 @@
 evals_to_run = [
-    # "MathVista_MINI",
-    # "MathVerse_MINI",
-    # "MathVision_MINI",
-    # "AI2D_TEST",
+    "MathVista_MINI",
+    "MathVerse_MINI",
+    "MathVision_MINI",
+    "AI2D_TEST",
     # "BLINK",
     # # "ChartMuseum_test",
-    # "ChartQA_TEST",
+    "ChartQA_TEST",
     # # "CharXiv_descriptive_val",
     # "DocVQA_VAL",
     # "HallusionBench",
     # # "LogicVista",
-    # "MMMU_DEV_VAL",
-    # "MMStar",
+    "MMMU_DEV_VAL",
+    "MMStar",
     # # "MUIRBench",
-    # "OCRBench",
+    "OCRBench",
     # # "OlympiadBench",
-    # "ScreenSpot_v2_Desktop",
-    # "ScreenSpot_v2_Mobile",
-    # "ScreenSpot_v2_Web",
+    "ScreenSpot_v2_Desktop",
+    "ScreenSpot_v2_Mobile",
+    "ScreenSpot_v2_Web",
     # # "ScreenSpot_Pro",
     # "WeMath",
     # "WildVision",
-    "ZEROBench_sub",
+    #"ZEROBench_sub",
     # # "VStarBench"
 ]
 
@@ -29,9 +29,10 @@ import subprocess, signal, sys, threading, os
 from pathlib import Path
 from datetime import datetime
 from queue import Queue
+from tqdm import tqdm
 
 
-logs_dir = Path("/home/jyotianeja/VLMEvalKit/logs")
+logs_dir = Path(__file__).parent / "logs"
 logs_dir.mkdir(exist_ok=True)
 
 def make_command(deployed_model_name, port, eval_name, api_nproc):
@@ -80,6 +81,7 @@ STOP = False  # flag to tell workers to stop early on Ctrl-C
 def run_eval_job(port: int, deployed_model_name: str, eval_name: str, api_nproc: int) -> int:
     """
     Run one eval for a given port. Returns the subprocess return code.
+    Stdout goes to the log file; stderr (where tqdm writes) goes to the terminal.
     """
 
     cmd = make_command(deployed_model_name, port, eval_name, api_nproc)
@@ -93,7 +95,7 @@ def run_eval_job(port: int, deployed_model_name: str, eval_name: str, api_nproc:
         proc = subprocess.Popen(
             cmd,
             stdout=log_file,
-            stderr=subprocess.STDOUT,
+            stderr=sys.stderr,
             text=True,
         )
         return_code = proc.wait()
@@ -103,7 +105,7 @@ def run_eval_job(port: int, deployed_model_name: str, eval_name: str, api_nproc:
     return return_code
 
 
-def worker(port: int, deployed_model_name: str, job_queue: Queue, api_nproc):
+def worker(port: int, deployed_model_name: str, job_queue: Queue, api_nproc, pbar: tqdm):
     """
     Worker loop: always grab the next job and run it on this port.
     """
@@ -113,12 +115,15 @@ def worker(port: int, deployed_model_name: str, job_queue: Queue, api_nproc):
         except:
             break
 
+        pbar.set_postfix_str(f'port {port}: {eval_name}')
         try:
             rc = run_eval_job(port, deployed_model_name, eval_name, api_nproc)
-            print(f"[port {port}] job {eval_name} finished with rc={rc}")
+            status = 'OK' if rc == 0 else f'FAIL(rc={rc})'
+            tqdm.write(f"[port {port}] {eval_name}: {status}")
         except Exception as e:
-            print(f"[port {port}] job {eval_name} failed: {e}", file=sys.stderr)
+            tqdm.write(f"[port {port}] {eval_name} failed: {e}")
         finally:
+            pbar.update(1)
             job_queue.task_done()
 
 
@@ -129,9 +134,11 @@ def main(model_name, ports, api_nproc):
     for job in evals_to_run:
         job_queue.put(job)
 
+    pbar = tqdm(total=len(evals_to_run), desc='Evals', unit='eval')
+
     threads = []
     for port in ports:
-        t = threading.Thread(target=worker, args=(port, model_name, job_queue, api_nproc), daemon=True)
+        t = threading.Thread(target=worker, args=(port, model_name, job_queue, api_nproc, pbar), daemon=True)
         t.start()
         threads.append(t)
 
@@ -139,8 +146,10 @@ def main(model_name, ports, api_nproc):
         # Wait for all jobs to be processed
         job_queue.join()
     except KeyboardInterrupt:
-        print("KeyboardInterrupt: stopping workers...", file=sys.stderr)
+        tqdm.write("KeyboardInterrupt: stopping workers...")
         STOP = True
+
+    pbar.close()
 
     # Ensure threads exit
     for t in threads:
