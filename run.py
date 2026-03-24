@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import time
 from functools import partial
 import pandas as pd
 
@@ -40,6 +41,7 @@ if LOCAL_WORLD_SIZE > 1 and len(GPU_LIST):
     )
 
 
+from tqdm import tqdm
 from vlmeval.config import supported_VLM
 from vlmeval.dataset.video_dataset_config import supported_video_datasets
 from vlmeval.dataset import build_dataset
@@ -253,6 +255,9 @@ def main():
             timeout=datetime.timedelta(seconds=int(os.environ.get('DIST_TIMEOUT', 3600)))
         )
 
+    total_combos = len(args.model) * len(args.data)
+    pbar = tqdm(total=total_combos, desc='Evaluations', unit='eval')
+
     for _, model_name in enumerate(args.model):
         model = None
         date, commit_id = timestr('day'), githash(digits=8)
@@ -273,6 +278,9 @@ def main():
             model = build_model_from_config(cfg['model'], model_name, args.use_vllm)
 
         for _, dataset_name in enumerate(args.data):
+            combo = f'{model_name} x {dataset_name}'
+            pbar.set_postfix_str(f'{combo} [setup]')
+            combo_start = time.time()
             if WORLD_SIZE > 1:
                 dist.barrier()
 
@@ -322,6 +330,8 @@ def main():
 
                 if args.mode != "eval":
                     # Perform the Inference
+                    pbar.set_postfix_str(f'{combo} [inference]')
+                    infer_start = time.time()
                     if dataset.MODALITY == 'VIDEO':
                         model = infer_data_job_video(
                             model,
@@ -352,6 +362,8 @@ def main():
                             api_nproc=args.api_nproc,
                             ignore_failed=args.ignore,
                             use_vllm=args.use_vllm)
+                    infer_elapsed = time.time() - infer_start
+                    tqdm.write(f'  [{combo}] Inference done in {infer_elapsed:.1f}s')
 
                 # Set the judge kwargs first before evaluation or dumping
 
@@ -481,6 +493,8 @@ def main():
                         proxy_set(eval_proxy)
 
                     # Perform the Evaluation
+                    pbar.set_postfix_str(f'{combo} [evaluation]')
+                    eval_start = time.time()
                     print(f'*********** Evaluating model {model_name} on dataset {dataset_name} with judge kwargs: {judge_kwargs}')
                     
                     # remove think section before evals inplace for all data.
@@ -526,6 +540,9 @@ def main():
                     ###########################
                     # eval_results = dataset.evaluate(result_file, **judge_kwargs)
                     # print(f'*********** Evaluation finished, results: {eval_results}')
+                    eval_elapsed = time.time() - eval_start
+                    combo_elapsed = time.time() - combo_start
+                    tqdm.write(f'  [{combo}] Evaluation done in {eval_elapsed:.1f}s (total: {combo_elapsed:.1f}s)')
                     # Display Evaluation Results in Terminal
                     if eval_results is not None:
                         assert isinstance(eval_results, dict) or isinstance(eval_results, pd.DataFrame)
@@ -556,7 +573,10 @@ def main():
             except Exception as e:
                 logger.exception(f'Model {model_name} x Dataset {dataset_name} combination failed: {e}, '
                                  'skipping this combination.')
-                continue
+            finally:
+                pbar.update(1)
+
+    pbar.close()
 
     if WORLD_SIZE > 1:
         dist.destroy_process_group()

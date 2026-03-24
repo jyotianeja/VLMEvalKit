@@ -246,7 +246,7 @@ def infer_data_job(
         data = dataset.data
         for x in data['index']:
             assert x in data_all
-        if os.getenv('SPLIT_THINK', False):
+        if os.getenv('SPLIT_THINK', True):
             prediction = []
             response_times = []
             completion_tokens_list = []
