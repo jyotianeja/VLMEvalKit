@@ -82,6 +82,19 @@ class ImageBaseDataset:
     def __getitem__(self, idx):
         return dict(self.data.iloc[idx])
 
+    def prepare_tsv_subsampled(self, url, file_md5=None):
+        print(r"""
+        ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️
+        WARNING: USING SUBSAMPLED DATA FOR THIS RUN 
+        ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️
+        """)
+
+        data_root = LMUDataRoot() + "/subsampled_tsvs"
+        file_name = f"{self.dataset_name}_SUBSAMPLED.tsv"
+        data_path = osp.join(data_root, file_name)
+        assert osp.exists(data_path)
+        return load(data_path)
+
     def prepare_tsv(self, url, file_md5=None):
         data_root = LMUDataRoot()
         os.makedirs(data_root, exist_ok=True)
@@ -178,6 +191,7 @@ class ImageBaseDataset:
             url = dataset + '.tsv'
         file_md5 = self.DATASET_MD5[dataset] if dataset in self.DATASET_MD5 else None
         return self.prepare_tsv(url, file_md5)
+        # return self.prepare_tsv_subsampled(url, file_md5)
 
     # Post built hook, will be called after the dataset is built, can override
     def post_build(self, dataset):
@@ -207,3 +221,4 @@ class ImageBaseDataset:
     @abstractmethod
     def evaluate(self, eval_file, **judge_kwargs):
         pass
+

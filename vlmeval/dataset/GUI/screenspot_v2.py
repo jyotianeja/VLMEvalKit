@@ -46,7 +46,8 @@ USER_INSTRUCTION_V2  = """Locate the the UI element this instruction describes: 
 def parse_bbox_aguvis(response):
     match = re.search(r"x=([\d.]+), y=([\d.]+)", response)
     if match:
-        click_point = [float(match.group(1)), float(match.group(2))]
+        # click_point = [float(match.group(1)), float(match.group(2))]
+        click_point = [float(match.group(1))/1000, float(match.group(2))/1000] #change done only for qwen
     else:
         click_point = [0.0, 0.0]
     return click_point

@@ -43,7 +43,12 @@ def infer_data_api(model, work_dir, model_name, dataset, index_set=None, api_npr
         else:
             struct = dataset.build_prompt(item)
         structs.append(struct)
-
+        # print(f'********* print struct example: {struct}')
+        # import sys
+        #change "single word or phrase" to "single word or number" in the prompt for ChartQA_TEST dataset
+        # if dataset_name == "ChartQA_TEST":
+            # struct[1]['value'] = struct[1]['value'].replace("single word or phrase", "single word or number")
+        # print(f'********* print modified struct example: {struct}')
     out_file = f'{work_dir}/{model_name}_{dataset_name}_supp.pkl'
 
     # To reuse records in MMBench_V11
@@ -298,7 +303,7 @@ def infer_data_job(
             print(f'************* Prediction format: {os.getenv("SPLIT_THINK")}, no splitting applied.')
             # print(f'************* Examples prediction: {data["prediction"][0:5]}')
             # print(f'************* Examples response_time: {data["response_time"][0:5]}')
-            print(f'************* Examples completion_tokens: {data["completion_tokens"][0:5]}')
+            # print(f'************* Examples completion_tokens: {data["completion_tokens"][0:5]}')
             print(f'************* total completion tokens: {sum([t for t in data["completion_tokens"] if t is not None])}')
             
         times = [t for t in data['response_time'] if t is not None]

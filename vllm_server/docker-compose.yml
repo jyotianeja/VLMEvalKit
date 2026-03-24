@@ -3,7 +3,7 @@ version: '3.8'
 x-vllm-common: &vllm-common
   image: vllm/vllm-openai:latest
   volumes:
-    - /home/jyotianeja/.cache/huggingface
+    - /home/jyotianeja/.cache/huggingface:/app/hf_cache
   environment:
     - HF_TOKEN=${HF_TOKEN}
     - HF_HOME=/app/hf_cache

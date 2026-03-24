@@ -246,6 +246,7 @@ def process_answer(answer):
 
 
 def process_line(line, method='vqa_score'):
+    # print(f'************ Processing line with method {method}: {line}')
     ret = {}
     if istype(line['answer'], list):
         answers = eval(line['answer'])
@@ -270,9 +271,11 @@ def process_line(line, method='vqa_score'):
         ret['pred'] = line['prediction']
         ret['match'] = [anls_compute(x, ret['pred']) for x in ret['gt']]
     elif method == 'relaxed_accuracy':
+        # print(f'************ Using relaxed accuracy for line: {line}')
         ret['gt'] = answers
         ret['pred'] = line['prediction'].strip()
         ret['match'] = [relaxed_correctness(x, ret['pred']) for x in ret['gt']]
+        # print(f'************ Prediction: {ret["pred"]}, Ground Truth: {ret["gt"]}, Match: {ret["match"]}')
     elif method == 'accuracy':
         ret['gt'] = answers
         ret['pred'] = line['prediction'].strip()

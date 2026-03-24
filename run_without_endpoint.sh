@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# MODEL="Qwen3-VL-8B-Instruct-API"
-MODEL="Qwen3-VL-8B-Instruct-API"
-API_NPROC=32
+# MODEL="Qwen3-VL-8B-Instruct-API
+MODEL="Qwen3.5-VL-9B-4096-think"
+API_NPROC=64
 
 BENCHMARKS=(
-  # MathVista_MINI
-  # MathVerse_MINI
-  # MathVision_MINI
-  # AI2D_TEST
-  # BLINK
-  # ChartQA_TEST
+  MathVista_MINI
+  MathVerse_MINI
+  MathVision_MINI
+  AI2D_TEST
+  BLINK
+  ChartQA_TEST
   # DocVQA_VAL
-  # HallusionBench
-  # MMMU_DEV_VAL
-  # MMStar
-  # # MUIRBench
-  # OCRBench
-  # # OlympiadBench
-  # ScreenSpot_v2_Desktop
-  # ScreenSpot_v2_Mobile
-  # ScreenSpot_v2_Web
-  # # ScreenSpot_Pro
-  # WeMath
+  HallusionBench
+  MMMU_DEV_VAL
+  MMStar
+  MUIRBench
+  OCRBench
+  # OlympiadBench
+  ScreenSpot_v2_Desktop
+  ScreenSpot_v2_Mobile
+  ScreenSpot_v2_Web
+  # ScreenSpot_Pro
+  WeMath
   # WildVision
   ZEROBench_sub
 )
@@ -38,7 +38,7 @@ for DATA in "${BENCHMARKS[@]}"; do
     --data "${DATA}" \
     --model "${MODEL}" \
     --api-nproc "${API_NPROC}" \
-    --judge "gpt-4o" \
+    --judge "gpt-4o" 
     # --reuse \
     # --mode eval --verbose
 

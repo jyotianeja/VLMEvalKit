@@ -1,5 +1,5 @@
 curl --request POST \
-  --url https://gateway.phyagi.net/api/chat/completions \
+  --url http://gateway.phyagi.net/api/chat/completions \
   --header 'Authorization: Bearer d4ef0743379f4fc992f9d02aba091743' \
   --header 'Content-Type: application/json' \
   --data '{
