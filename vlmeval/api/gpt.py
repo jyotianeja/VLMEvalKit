@@ -48,6 +48,7 @@ class OpenAIWrapper(BaseAPI):
                  img_size: int = -1,
                  img_detail: str = 'low',
                  use_azure: bool = False,
+                 chat_template_kwargs: dict = {"enable_thinking": False},
                  **kwargs):
 
         self.model = model
@@ -56,6 +57,7 @@ class OpenAIWrapper(BaseAPI):
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.use_azure = use_azure
+        self.chat_template_kwargs = chat_template_kwargs
 
         if 'step' in model:
             env_key = os.environ.get('STEPAI_API_KEY', '')
@@ -121,6 +123,7 @@ class OpenAIWrapper(BaseAPI):
         self.timeout = timeout
         self.is_max_completion_tokens = ('o1' in model) or ('o3' in model) or ('o4' in model) or ('gpt-5' in model)
         self.is_o_model = ('o1' in model) or ('o3' in model) or ('o4' in model)
+        self.chat_template_kwargs = chat_template_kwargs
         super().__init__(retry=retry, system_prompt=system_prompt, verbose=verbose, **kwargs)
 
         if use_azure:
@@ -162,7 +165,7 @@ class OpenAIWrapper(BaseAPI):
         # Round-robin support: if OPENAI_API_BASES is set (comma-separated URLs), rotate across them
         api_bases_env = os.environ.get('OPENAI_API_BASES', '')
         # if api_bases_env:
-        if api_bases_env and api_base == "http://localhost:8000/v1/chat/completions": #note port 8000 is hardcoded here
+        if api_bases_env and api_base == "http://localhost:9000/v1/chat/completions": #note port 9000 is hardcoded here
             self.api_bases = [u.strip() for u in api_bases_env.split(',') if u.strip()]
             self._rr_cycle = itertools.cycle(self.api_bases)
             self._rr_lock = threading.Lock()
@@ -182,7 +185,8 @@ class OpenAIWrapper(BaseAPI):
             content_list = []
             for msg in inputs:
                 if msg['type'] == 'text':
-                    content_list.append(dict(type='text', text=msg['value']))
+                    content_list.append(dict(type='text', text = msg['value']))
+                    # content_list.append(dict(type='text', text = 'Use THINK mode for this question. Return the Thought and Solution using the specified format: <think> {Thought section} </think> {Solution section}. ' + msg['value']))
                 elif msg['type'] == 'image':
                     from PIL import Image
                     img = Image.open(msg['value'])
@@ -243,7 +247,6 @@ class OpenAIWrapper(BaseAPI):
             payload.pop('n')
             payload['reasoning_effort'] = 'high'
         # print(f'****************** API Request Payload : {payload}')
-        # assert False
         
         if self.api_bases:
             with self._rr_lock:
@@ -264,7 +267,7 @@ class OpenAIWrapper(BaseAPI):
             if self.verbose:
                 self.logger.error(f'{type(err)}: {err}')
                 self.logger.error(response.text if hasattr(response, 'text') else response)
-        # print(f'API Response : {response}')
+        # print(f'API Response : {answer}')
         return ret_code, answer, response
 
     def get_image_token_len(self, img_path, detail='low'):

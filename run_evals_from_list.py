@@ -1,28 +1,28 @@
 evals_to_run = [
-    "MathVista_MINI",
+    "AI2D_TEST",
+     # "BLINK",
+     # "ChartMuseum_test",
+     # "ChartQA_TEST",
+     # "CharXiv_descriptive_val",
+     # "DocVQA_VAL",
+    "HallusionBench",
     "MathVerse_MINI",
     "MathVision_MINI",
-    "AI2D_TEST",
-    # "BLINK",
-    # # "ChartMuseum_test",
-    "ChartQA_TEST",
-    # # "CharXiv_descriptive_val",
-    # "DocVQA_VAL",
-    # "HallusionBench",
-    # # "LogicVista",
+    "MathVista_MINI",        
+     # "LogicVista",
     "MMMU_DEV_VAL",
     "MMStar",
-    # # "MUIRBench",
+    # "MUIRBench",
     "OCRBench",
-    # # "OlympiadBench",
+    # "OlympiadBench",
     "ScreenSpot_v2_Desktop",
     "ScreenSpot_v2_Mobile",
     "ScreenSpot_v2_Web",
-    # # "ScreenSpot_Pro",
+    # "ScreenSpot_Pro",
     # "WeMath",
     # "WildVision",
-    #"ZEROBench_sub",
-    # # "VStarBench"
+    # "ZEROBench_sub",
+    # "VStarBench"
 ]
 
 import subprocess, signal, sys, threading, os
@@ -38,6 +38,7 @@ logs_dir.mkdir(exist_ok=True)
 def make_command(deployed_model_name, port, eval_name, api_nproc):
     return [
         "python",
+        "-u",
         "run.py",
         "--model",
         deployed_model_name + f"-{port}",
@@ -86,6 +87,8 @@ def run_eval_job(port: int, deployed_model_name: str, eval_name: str, api_nproc:
 
     cmd = make_command(deployed_model_name, port, eval_name, api_nproc)
 
+    print(f"Starting with command: {' '.join(cmd)}")
+
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_path = logs_dir / f"{eval_name}_model{deployed_model_name}_port{port}_{timestamp}.log"
     with log_path.open("a", buffering=1) as log_file:
@@ -94,10 +97,13 @@ def run_eval_job(port: int, deployed_model_name: str, eval_name: str, api_nproc:
 
         proc = subprocess.Popen(
             cmd,
-            stdout=log_file,
+            stdout=subprocess.PIPE,
             stderr=sys.stderr,
             text=True,
         )
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            log_file.write(line)
         return_code = proc.wait()
 
         log_file.write(f"\n=== END {eval_name} (rc={return_code}) ===\n")
