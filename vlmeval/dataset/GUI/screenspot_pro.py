@@ -32,21 +32,49 @@ logger = get_logger("RUN")
 }
 """
 
-SYSTEM_PROMPT = """You are a GUI agent. You are given a task and a screenshot of the screen. You need to perform pyautogui click/moveTo action to complete the task. The answer format is `pyautogui.click(x=?, y=?), x and y is necessary`"""  # noqa: E501
+SYSTEM_PROMPT = """You are a GUI agent. You are given a task and a screenshot of the screen. Locate the target UI element and output its bounding box as `[x1, y1, x2, y2]` using relative coordinates from 0.0000 to 1.0000."""  # noqa: E501
 
-USER_INSTRUCTION = """Please complete the following tasks by clicking using `pyautogui.click`:\n{instruction}"""  # noqa: E501
+USER_INSTRUCTION = """Locate the UI element this instruction describes: {instruction}\nOutput its bounding box coordinates as [x1, y1, x2, y2] using relative coordinates from 0.0000 to 1.0000."""  # noqa: E501
 
-SYSTEM_PROMPT_V2 = """You are a GUI agent. You are given a screenshot of the screen and the description of a target element. You need to click the target element using `pyautogui.click`. The answer format is `pyautogui.click(x=?, y=?), x and y is necessary`"""  # noqa: E501
-USER_INSTRUCTION_V2 = """Please click the following target element using `pyautogui.click`:\n{description}"""
+SYSTEM_PROMPT_V2 = """You are a GUI agent. You are given a screenshot of the screen and the description of a target element. Locate the target element and output its bounding box as `[x1, y1, x2, y2]` using relative coordinates from 0.0000 to 1.0000."""  # noqa: E501
+USER_INSTRUCTION_V2 = """Locate the UI element this instruction describes: {description}\nOutput its bounding box coordinates as [x1, y1, x2, y2] using relative coordinates from 0.0000 to 1.0000."""  # noqa: E501
 
 
 def parse_bbox_aguvis(response):
+    """Legacy parser for `pyautogui.click(x=N, y=N)` outputs. Kept for the
+    rectangle-eval path and external callers; the point-eval path now uses
+    the more permissive ``parse_response_flexible`` below."""
     match = re.search(r"x=([\d.]+), y=([\d.]+)", response)
     if match:
         click_point = [float(match.group(1)), float(match.group(2))]
     else:
         click_point = [0.0, 0.0]
     return click_point
+
+
+def parse_bbox_xyxy(response):
+    """Parse the first ``[x1, y1, x2, y2]`` bbox in ``response`` and return
+    its center as a click point. Accepts ``[ ]`` or ``( )`` brackets and
+    any inter-number whitespace. Returns ``None`` on no match."""
+    m = re.search(
+        r"[\[\(]\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*"
+        r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*[\]\)]",
+        response,
+    )
+    if not m:
+        return None
+    x1, y1, x2, y2 = (float(m.group(i)) for i in range(1, 5))
+    return [(x1 + x2) / 2.0, (y1 + y2) / 2.0]
+
+
+def parse_response_flexible(response):
+    """Try the trained bbox format first (`[x1, y1, x2, y2]`), then fall
+    back to the pyautogui click format. Returns ``[0.0, 0.0]`` if neither
+    matches so downstream IoU/center checks fail rather than crash."""
+    pt = parse_bbox_xyxy(response)
+    if pt is not None:
+        return pt
+    return parse_bbox_aguvis(response)
 
 
 def compute_iou(box1, box2):
@@ -183,7 +211,7 @@ class ScreenSpot_Pro(ImageBaseDataset):
         data["index"] = [str(idx + 1) for idx, x in enumerate(data["bbox"])]
 
         self.meta_only = True
-        self.parse_response_func = parse_bbox_aguvis  # TODO: parse function can be specified through kwargs when initializing the dataset # noqa: E501
+        self.parse_response_func = parse_response_flexible  # tries [x1,y1,x2,y2] bbox first, falls back to pyautogui.click format # noqa: E501
 
         # The image field can store the base64 encoded image or another question index (for saving space) # noqa: E501
         if "image" in data:
